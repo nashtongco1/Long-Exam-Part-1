@@ -19,9 +19,9 @@ const orderRoutes = require("./tongco-server/routes/orderRoutes");
 
 const auditLogger = require("./tongco-server/middleware/auditLoggerMiddleware");
 
-const {apiLimiter} = require("./tongco-server/middleware/rateLimiterMiddleware");
+const { apiLimiter } = require("./tongco-server/middleware/rateLimiterMiddleware");
 
-const {notFound, errorHandler } = require("./tongco-server/middleware/errorMiddleware");
+const { notFound, errorHandler } = require("./tongco-server/middleware/errorMiddleware");
 
 connectDB();
 
@@ -49,8 +49,20 @@ app.use(helmet({
     }
 }));
 
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
 const corsOptions = {
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
@@ -75,16 +87,18 @@ app.use(express.urlencoded({
 
 app.use(auditLogger);
 
-
 app.use("/api", (req, res, next) => {
-    if (req.path === "/users" || req.path.startsWith("/users/") ||
-        req.path === "/v1/users" || req.path.startsWith("/v1/users/")) {
+    if (
+        req.path === "/users" ||
+        req.path.startsWith("/users/") ||
+        req.path === "/v1/users" ||
+        req.path.startsWith("/v1/users/")
+    ) {
         return next();
     }
 
     return apiLimiter(req, res, next);
 });
-
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
