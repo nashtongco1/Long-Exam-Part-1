@@ -1,25 +1,6 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import logo from '../assets/img/cover.jpg';
-
-const publicLinks = [
-  { label: 'Home', to: '/' },
-  { label: 'About', to: '/about' },
-  { label: 'Products', to: '/products' },
-];
-
-const customerLinks = [
-  { label: 'Cart', to: '/cart' },
-  { label: 'Orders', to: '/orders' },
-];
-
-const adminLinks = [
-  { label: 'Admin', to: '/admin' },
-];
-
-const authLinks = [
-  { label: 'Sign In', to: '/auth/signin' },
-  { label: 'Sign Up', to: '/auth/signup' },
-];
 
 const navLinkClassName = ({ isActive }) =>
   [
@@ -40,33 +21,63 @@ const authLinkClassName = ({ isActive }) =>
 const NavBar = () => {
   const navigate = useNavigate();
 
-  const token = localStorage.getItem('token');
+  const [token, setToken] = useState(
+    localStorage.getItem('token')
+  );
 
-  let user = null;
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('user');
 
-  try {
-    user = JSON.parse(localStorage.getItem('user'));
-  } catch {
-    user = null;
-  }
+      return savedUser
+        ? JSON.parse(savedUser)
+        : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const isLoggedIn = Boolean(token && user);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
 
-    navigate('/auth/signin');
+    setToken(null);
+    setUser(null);
 
-    window.location.reload();
+    navigate('/');
   };
 
-  let roleLinks = [];
+  const customerLinks = [
+    { label: 'Home', to: '/' },
+    { label: 'About', to: '/about' },
+    { label: 'Products', to: '/products' },
+    { label: 'Cart', to: '/cart' },
+    { label: 'Orders', to: '/orders' },
+  ];
 
-  if (user?.role === 'customer') {
-    roleLinks = customerLinks;
+  const guestLinks = [
+    { label: 'Home', to: '/' },
+    { label: 'About', to: '/about' },
+    { label: 'Products', to: '/products' },
+  ];
+
+  const adminLinks = [
+    { label: 'Home', to: '/' },
+    { label: 'About', to: '/about' },
+    { label: 'Products', to: '/products' },
+    { label: 'Admin', to: '/admin' },
+  ];
+
+  let links = guestLinks;
+
+  if (isLoggedIn && user?.role === 'customer') {
+    links = customerLinks;
   }
 
-  if (user?.role === 'admin') {
-    roleLinks = adminLinks;
+  if (isLoggedIn && user?.role === 'admin') {
+    links = adminLinks;
   }
 
   return (
@@ -79,20 +90,17 @@ const NavBar = () => {
         >
           <img
             src={logo}
-            alt="EcoEssentials"
+            alt="Rushline Apparel"
             className="h-9 w-9 rounded-full border-2 border-purple-900 bg-purple-50 object-contain"
           />
 
-          <div className="space-y-0.5">
-            <p className="text-xl font-bold text-purple-900">
-              Rushline Apparel
-            </p>
-          </div>
+          <p className="text-xl font-bold text-purple-900">
+            Rushline Apparel
+          </p>
         </NavLink>
 
         <nav className="hidden items-center gap-2 md:flex">
-
-          {publicLinks.map((link) => (
+          {links.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
@@ -102,32 +110,26 @@ const NavBar = () => {
               {link.label}
             </NavLink>
           ))}
-
-          {token &&
-            roleLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={navLinkClassName}
-              >
-                {link.label}
-              </NavLink>
-            ))}
-
         </nav>
 
         <nav className="hidden items-center gap-2 md:flex">
 
-          {!token || !user ? (
-            authLinks.map((link) => (
+          {!isLoggedIn ? (
+            <>
               <NavLink
-                key={link.to}
-                to={link.to}
+                to="/auth/signin"
                 className={authLinkClassName}
               >
-                {link.label}
+                Sign In
               </NavLink>
-            ))
+
+              <NavLink
+                to="/auth/signup"
+                className={authLinkClassName}
+              >
+                Sign Up
+              </NavLink>
+            </>
           ) : (
             <>
               <NavLink

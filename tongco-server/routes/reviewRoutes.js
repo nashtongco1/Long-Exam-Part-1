@@ -3,7 +3,9 @@ const express = require("express");
 const {
     createReview,
     getReviews,
-    updateReview
+    getReviewById,
+    updateReview,
+    deleteReview
 } = require("../controllers/reviewController");
 
 const protect = require("../middleware/authMiddleware");
@@ -12,6 +14,8 @@ const authorizeRoles = require("../middleware/roleMiddleware");
 const router = express.Router();
 
 router.get("/", getReviews);
+
+router.get("/:id", getReviewById);
 
 router.post(
     "/",
@@ -23,8 +27,15 @@ router.post(
 router.put(
     "/:id",
     protect,
-    authorizeRoles("admin"),
+    authorizeRoles("customer", "admin"),
     updateReview
+);
+
+router.delete(
+    "/:id",
+    protect,
+    authorizeRoles("customer", "admin"),
+    deleteReview
 );
 
 module.exports = router;

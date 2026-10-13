@@ -1,28 +1,40 @@
+
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const { HttpStatus } = require("../config/constants");
 
 
-// ADD PRODUCT TO CART
 const addToCart = async (req, res) => {
     try {
         const { productId, quantity } = req.body;
+        const requestedQuantity = Number(quantity);
 
-        if (!productId || !quantity || quantity < 1) {
-            return res.status(400).json({
+        if (!req.user?._id) {
+            return res.status(401).json({
+                success: false,
+                message: "Please log in to add products to your cart"
+            });
+        }
+
+        if (!productId || !Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
                 message: "Product and valid quantity are required"
             });
         }
 
         const product = await Product.findById(productId);
 
-        if (!product || !product.isActive) {
-            return res.status(404).json({
-                message: "Product not found"
+        if (!product || product.isAvailable === false || product.isActive === false) {
+            return res.status(HttpStatus.NOT_FOUND).json({
+                success: false,
+                message: "Product not found or unavailable"
             });
         }
 
-        if (quantity > product.stock) {
-            return res.status(400).json({
+        if (requestedQuantity > product.stock) {
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
                 message: "Not enough product stock"
             });
         }
@@ -33,97 +45,123 @@ const addToCart = async (req, res) => {
         });
 
         if (!cart) {
-            cart = await Order.create({
+            cart = new Order({
                 user: req.user._id,
                 items: [],
-                status: "cart"
+                totalAmount: 0,
+                status: "cart",
+                paymentStatus: "pending",
+                shippingAddress: "Pending"
             });
         }
 
         const existingItem = cart.items.find(
-            (item) => item.product.toString() === productId
+            (item) => item.product.toString() === product._id.toString()
         );
 
         if (existingItem) {
-            const newQuantity = existingItem.quantity + quantity;
+            const newQuantity = Number(existingItem.quantity) + requestedQuantity;
 
             if (newQuantity > product.stock) {
-                return res.status(400).json({
+                return res.status(HttpStatus.BAD_REQUEST).json({
+                    success: false,
                     message: "Not enough product stock"
                 });
             }
 
             existingItem.quantity = newQuantity;
             existingItem.price = product.price;
-
         } else {
             cart.items.push({
                 product: product._id,
-                quantity,
+                quantity: requestedQuantity,
                 price: product.price
             });
         }
 
         cart.totalAmount = cart.items.reduce(
-            (total, item) => total + item.price * item.quantity,
+            (total, item) => total + Number(item.price) * Number(item.quantity),
             0
         );
 
         await cart.save();
 
-        const populatedCart = await Order.findById(cart._id)
-            .populate("items.product", "name price image stock");
+        const populatedCart = await Order.findById(cart._id).populate(
+            "items.product",
+            "name price image stock isAvailable"
+        );
 
-        res.status(200).json({
+        return res.status(HttpStatus.OK).json({
+            success: true,
             message: "Product added to cart successfully",
-            cart: populatedCart
+            count: populatedCart.items.length,
+            data: [populatedCart]
         });
-
     } catch (error) {
-        res.status(500).json({
-            message: "Server error",
+        console.error("Add to Cart Error:", error);
+
+        return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to add product to cart",
             error: error.message
         });
     }
 };
 
 
-// VIEW CART
 const getCart = async (req, res) => {
     try {
         const cart = await Order.findOne({
             user: req.user._id,
             status: "cart"
-        }).populate("items.product", "name price image stock");
+        }).populate(
+            "items.product",
+            "name price image stock isAvailable"
+        );
 
         if (!cart) {
-            return res.status(200).json({
-                items: [],
-                totalAmount: 0
+            return res.status(HttpStatus.OK).json({
+                success: true,
+                message: "Cart retrieved successfully",
+                count: 0,
+                data: []
             });
         }
 
-        res.status(200).json(cart);
-
+        res.status(HttpStatus.OK).json({
+            success: true,
+            message: "Cart retrieved successfully",
+            count: cart.items.length,
+            data: [cart]
+        });
     } catch (error) {
-        res.status(500).json({
-            message: "Server error",
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to retrieve cart",
             error: error.message
         });
     }
 };
 
-
-// CHECKOUT CART
 const checkoutOrder = async (req, res) => {
     try {
+        const { shippingAddress } = req.body;
+
+        if (!shippingAddress) {
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
+                message: "Shipping address is required"
+            });
+        }
+
         const cart = await Order.findOne({
             user: req.user._id,
             status: "cart"
         });
 
         if (!cart || cart.items.length === 0) {
-            return res.status(400).json({
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
                 message: "Cart is empty"
             });
         }
@@ -132,13 +170,22 @@ const checkoutOrder = async (req, res) => {
             const product = await Product.findById(item.product);
 
             if (!product) {
-                return res.status(404).json({
+                return res.status(HttpStatus.NOT_FOUND).json({
+                    success: false,
                     message: "A product in the cart no longer exists"
                 });
             }
 
+            if (!product.isAvailable) {
+                return res.status(HttpStatus.BAD_REQUEST).json({
+                    success: false,
+                    message: `${product.name} is unavailable`
+                });
+            }
+
             if (product.stock < item.quantity) {
-                return res.status(400).json({
+                return res.status(HttpStatus.BAD_REQUEST).json({
+                    success: false,
                     message: `Not enough stock for ${product.name}`
                 });
             }
@@ -149,31 +196,41 @@ const checkoutOrder = async (req, res) => {
 
             product.stock -= item.quantity;
 
+            if (product.stock === 0) {
+                product.isAvailable = false;
+            }
+
             await product.save();
         }
 
         cart.status = "ongoing";
+        cart.paymentStatus = "pending";
+        cart.shippingAddress = shippingAddress;
+        cart.orderDate = new Date();
 
         await cart.save();
 
         const order = await Order.findById(cart._id)
-            .populate("items.product", "name price image");
+            .populate(
+                "items.product",
+                "name price image stock isAvailable"
+            );
 
-        res.status(200).json({
+        res.status(HttpStatus.OK).json({
+            success: true,
             message: "Order placed successfully",
-            order
+            count: 1,
+            data: [order]
         });
-
     } catch (error) {
-        res.status(500).json({
-            message: "Server error",
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to checkout order",
             error: error.message
         });
     }
 };
 
-
-// CUSTOMER VIEW ONGOING ORDERS
 const getMyOrders = async (req, res) => {
     try {
         const orders = await Order.find({
@@ -182,21 +239,27 @@ const getMyOrders = async (req, res) => {
                 $ne: "cart"
             }
         })
-            .populate("items.product", "name price image")
+            .populate(
+                "items.product",
+                "name price image"
+            )
             .sort({ createdAt: -1 });
 
-        res.status(200).json(orders);
-
+        res.status(HttpStatus.OK).json({
+            success: true,
+            message: "Orders retrieved successfully",
+            count: orders.length,
+            data: orders
+        });
     } catch (error) {
-        res.status(500).json({
-            message: "Server error",
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to retrieve orders",
             error: error.message
         });
     }
 };
 
-
-// ADMIN VIEW ALL ORDERS
 const getAllOrders = async (req, res) => {
     try {
         const orders = await Order.find({
@@ -205,33 +268,41 @@ const getAllOrders = async (req, res) => {
             }
         })
             .populate("user", "name email")
-            .populate("items.product", "name price image")
+            .populate(
+                "items.product",
+                "name price image"
+            )
             .sort({ createdAt: -1 });
 
-        res.status(200).json(orders);
-
+        res.status(HttpStatus.OK).json({
+            success: true,
+            message: "Orders retrieved successfully",
+            count: orders.length,
+            data: orders
+        });
     } catch (error) {
-        res.status(500).json({
-            message: "Server error",
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to retrieve orders",
             error: error.message
         });
     }
 };
 
-
-// ADMIN CONFIRM ORDER
 const confirmOrder = async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
 
         if (!order) {
-            return res.status(404).json({
+            return res.status(HttpStatus.NOT_FOUND).json({
+                success: false,
                 message: "Order not found"
             });
         }
 
         if (order.status !== "ongoing") {
-            return res.status(400).json({
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
                 message: "Only ongoing orders can be confirmed"
             });
         }
@@ -240,33 +311,35 @@ const confirmOrder = async (req, res) => {
 
         await order.save();
 
-        res.status(200).json({
+        res.status(HttpStatus.OK).json({
+            success: true,
             message: "Order confirmed successfully",
-            order
+            count: 1,
+            data: [order]
         });
-
     } catch (error) {
-        res.status(500).json({
-            message: "Server error",
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to confirm order",
             error: error.message
         });
     }
 };
 
-
-// ADMIN MARK ORDER READY
 const markOrderReady = async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
 
         if (!order) {
-            return res.status(404).json({
+            return res.status(HttpStatus.NOT_FOUND).json({
+                success: false,
                 message: "Order not found"
             });
         }
 
         if (order.status !== "confirmed") {
-            return res.status(400).json({
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
                 message: "Order must be confirmed first"
             });
         }
@@ -275,19 +348,70 @@ const markOrderReady = async (req, res) => {
 
         await order.save();
 
-        res.status(200).json({
+        res.status(HttpStatus.OK).json({
+            success: true,
             message: "Order is ready for claiming",
-            order
+            count: 1,
+            data: [order]
         });
-
     } catch (error) {
-        res.status(500).json({
-            message: "Server error",
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to update order",
             error: error.message
         });
     }
 };
 
+const markOrderDelivered = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.status(HttpStatus.NOT_FOUND).json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        if (order.user.toString() !== req.user._id.toString()) {
+            return res.status(HttpStatus.FORBIDDEN).json({
+                success: false,
+                message: "You are not authorized to update this order"
+            });
+        }
+
+        if (order.status !== "ready") {
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
+                message: "Only ready orders can be marked as received"
+            });
+        }
+
+        order.status = "delivered";
+
+        await order.save();
+
+        const updatedOrder = await Order.findById(order._id)
+            .populate(
+                "items.product",
+                "name price image"
+            );
+
+        res.status(HttpStatus.OK).json({
+            success: true,
+            message: "Item received successfully. Order marked as delivered.",
+            count: 1,
+            data: [updatedOrder]
+        });
+    } catch (error) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: "Failed to mark order as delivered",
+            error: error.message
+        });
+    }
+};
 
 module.exports = {
     addToCart,
@@ -296,5 +420,6 @@ module.exports = {
     getMyOrders,
     getAllOrders,
     confirmOrder,
-    markOrderReady
+    markOrderReady,
+    markOrderDelivered
 };

@@ -12,13 +12,12 @@ const ProductCard = ({ product, index }) => {
   return (
     <article className="rounded-3xl border-2 border-purple-900 bg-purple-100 p-4">
 
-      <div className="overflow-hidden rounded-[1.25rem] bg-yellow-200">
-
+      <div className="h-80 overflow-hidden rounded-[1.25rem] bg-white">
         {productImage ? (
           <img
             src={productImage}
             alt={product.name}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain p-4"
             onError={(e) => {
               if (fallbackImage) {
                 e.currentTarget.src = fallbackImage;
@@ -28,13 +27,12 @@ const ProductCard = ({ product, index }) => {
             }}
           />
         ) : (
-          <div className="flex aspect-square items-center justify-center bg-purple-200 px-6 text-center">
+          <div className="flex h-full w-full items-center justify-center bg-purple-200 px-6 text-center">
             <p className="text-sm font-semibold text-purple-600">
               No Product Image
             </p>
           </div>
         )}
-
       </div>
 
       <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.24em] text-purple-500">

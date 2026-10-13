@@ -1,3 +1,4 @@
+
 const express = require("express");
 
 const {
@@ -7,7 +8,8 @@ const {
     getMyOrders,
     getAllOrders,
     confirmOrder,
-    markOrderReady
+    markOrderReady,
+    markOrderDelivered
 } = require("../controllers/orderController");
 
 const protect = require("../middleware/authMiddleware");
@@ -15,58 +17,20 @@ const authorizeRoles = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
+router.post("/cart", protect, authorizeRoles("customer"), addToCart);
 
-// CUSTOMER
-router.post(
-    "/cart",
-    protect,
-    authorizeRoles("customer"),
-    addToCart
-);
+router.get("/cart", protect, authorizeRoles("customer"), getCart);
 
-router.get(
-    "/cart",
-    protect,
-    authorizeRoles("customer"),
-    getCart
-);
+router.post("/checkout", protect, authorizeRoles("customer"), checkoutOrder);
 
-router.post(
-    "/checkout",
-    protect,
-    authorizeRoles("customer"),
-    checkoutOrder
-);
+router.get("/my-orders", protect, authorizeRoles("customer"), getMyOrders);
 
-router.get(
-    "/my-orders",
-    protect,
-    authorizeRoles("customer"),
-    getMyOrders
-);
+router.get("/", protect, authorizeRoles("admin"), getAllOrders);
 
+router.put("/:id/confirm", protect, authorizeRoles("admin"), confirmOrder);
 
-// ADMIN
-router.get(
-    "/",
-    protect,
-    authorizeRoles("admin"),
-    getAllOrders
-);
+router.put("/:id/ready", protect, authorizeRoles("admin"), markOrderReady);
 
-router.put(
-    "/:id/confirm",
-    protect,
-    authorizeRoles("admin"),
-    confirmOrder
-);
-
-router.put(
-    "/:id/ready",
-    protect,
-    authorizeRoles("admin"),
-    markOrderReady
-);
-
+router.put("/:id/delivered", protect, authorizeRoles("customer"), markOrderDelivered);
 
 module.exports = router;

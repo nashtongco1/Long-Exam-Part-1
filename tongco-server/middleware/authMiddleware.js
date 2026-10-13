@@ -1,5 +1,7 @@
+
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { HttpStatus } = require("../config/constants");
 
 const protect = async (req, res, next) => {
     try {
@@ -13,7 +15,7 @@ const protect = async (req, res, next) => {
         }
 
         if (!token) {
-            return res.status(401).json({
+            return res.status(HttpStatus.UNAUTHORIZED).json({
                 message: "Not authorized, no token"
             });
         }
@@ -26,13 +28,13 @@ const protect = async (req, res, next) => {
         const user = await User.findById(decoded.id).select("-password");
 
         if (!user) {
-            return res.status(401).json({
+            return res.status(HttpStatus.UNAUTHORIZED).json({
                 message: "User not found"
             });
         }
 
         if (!user.isActive) {
-            return res.status(403).json({
+            return res.status(HttpStatus.FORBIDDEN).json({
                 message: "Account is inactive"
             });
         }
@@ -40,9 +42,8 @@ const protect = async (req, res, next) => {
         req.user = user;
 
         next();
-
     } catch (error) {
-        return res.status(401).json({
+        return res.status(HttpStatus.UNAUTHORIZED).json({
             message: "Not authorized, token failed"
         });
     }

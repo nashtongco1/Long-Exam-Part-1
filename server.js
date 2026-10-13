@@ -1,6 +1,11 @@
-const express = require("express");
+
 const dotenv = require("dotenv");
+
+dotenv.config();
+
+const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 
 const connectDB = require("./tongco-server/config/db");
 
@@ -12,14 +17,74 @@ const supplierRoutes = require("./tongco-server/routes/supplierRoutes");
 const reviewRoutes = require("./tongco-server/routes/reviewRoutes");
 const orderRoutes = require("./tongco-server/routes/orderRoutes");
 
-dotenv.config();
+const auditLogger = require("./tongco-server/middleware/auditLoggerMiddleware");
+
+const {apiLimiter} = require("./tongco-server/middleware/rateLimiterMiddleware");
+
+const {notFound, errorHandler } = require("./tongco-server/middleware/errorMiddleware");
 
 connectDB();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'", "data:"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+            upgradeInsecureRequests: []
+        }
+    },
+    frameguard: {
+        action: "sameorigin"
+    },
+    referrerPolicy: {
+        policy: "strict-origin-when-cross-origin"
+    }
+}));
+
+const corsOptions = {
+    origin: "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+        "Origin",
+        "X-Requested-With",
+        "Accept",
+        "Content-Type",
+        "Authorization"
+    ]
+};
+
+app.use(cors(corsOptions));
+
+app.use(express.json({
+    limit: "10mb"
+}));
+
+app.use(express.urlencoded({
+    extended: true,
+    limit: "10mb"
+}));
+
+app.use(auditLogger);
+
+
+app.use("/api", (req, res, next) => {
+    if (req.path === "/users" || req.path.startsWith("/users/") ||
+        req.path === "/v1/users" || req.path.startsWith("/v1/users/")) {
+        return next();
+    }
+
+    return apiLimiter(req, res, next);
+});
+
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -28,11 +93,23 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/orders", orderRoutes);
+
+app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/categories", categoryRoutes);
+app.use("/api/v1/suppliers", supplierRoutes);
+app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/users", userRoutes);
+
 app.get("/", (req, res) => {
-    res.json({
+    res.status(200).json({
+        success: true,
         message: "Bulldogs Exchange API Running"
     });
 });
+
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 

@@ -12,18 +12,31 @@ const productImages = {
   'Nike Compression Shirt': compressionShirt,
   'Nike Running Shoes': runningShoes,
   'Nike Socks': nikeSocks,
+
   'Adidas T-shirt': adidasTshirt,
   'Adidas Hoodie': adidasHoodie,
   'Adidas Socks': adidasSocks,
+
   'Puma Sports Cap': pumaCap,
   'Puma Socks': pumaSocks,
+
   'Wireless Headphones': headphonesImage,
 };
 
-export const getFallbackProductImage = (product) =>
-  productImages[product?.name] || headphonesImage;
+export const getFallbackProductImage = (product) => {
+  return productImages[product?.name] || '';
+};
 
-export const getProductImage = (product) =>
-  product?.image || getFallbackProductImage(product);
+export const getProductImage = (product) => {
+  if (
+    product?.image &&
+    typeof product.image === 'string' &&
+    product.image.trim() !== ''
+  ) {
+    return product.image;
+  }
+
+  return getFallbackProductImage(product);
+};
 
 export default productImages;
