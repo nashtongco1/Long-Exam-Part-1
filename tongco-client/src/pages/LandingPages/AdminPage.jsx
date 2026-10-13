@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Button from '../../components/Button.jsx';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://rushline-apparel-api.onrender.com/api';
 const inputClasses = 'mt-2 w-full rounded-xl border border-purple-300 bg-purple-100 px-4 py-3 text-sm text-purple-900 outline-none transition placeholder:text-purple-400 focus:border-purple-900 focus:bg-purple-50';
 const getArrayData = (data) => {
   if (Array.isArray(data)) return data;

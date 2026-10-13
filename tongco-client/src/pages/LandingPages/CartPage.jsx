@@ -43,7 +43,7 @@ const CartPage = () => {
 
     try {
       const response = await fetch(
-        'http://localhost:5000/api/orders/cart',
+        'https://rushline-apparel-api.onrender.com/api/orders/cart',
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -83,7 +83,7 @@ const CartPage = () => {
 
     try {
       const response = await fetch(
-        'http://localhost:5000/api/users/profile',
+        'https://rushline-apparel-api.onrender.com/api/users/profile',
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -162,7 +162,7 @@ const CartPage = () => {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/orders/checkout',
+        'https://rushline-apparel-api.onrender.com/api/orders/checkout',
         {
           method: 'POST',
           headers: {

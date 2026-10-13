@@ -57,7 +57,7 @@ function ProductPage() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/reviews?product=${productId}`
+        `https://rushline-apparel-api.onrender.com/api/reviews?product=${productId}`
       );
 
       const data = await response.json();
@@ -83,7 +83,7 @@ function ProductPage() {
         setReviews([]);
 
         const response = await fetch(
-          `http://localhost:5000/api/products/${id}`
+          `https://rushline-apparel-api.onrender.com/api/products/${id}`
         );
 
         const data = await response.json();
@@ -141,7 +141,7 @@ function ProductPage() {
 
     try {
       const response = await fetch(
-        'http://localhost:5000/api/orders/cart',
+        'https://rushline-apparel-api.onrender.com/api/orders/cart',
         {
           method: 'POST',
           headers: {

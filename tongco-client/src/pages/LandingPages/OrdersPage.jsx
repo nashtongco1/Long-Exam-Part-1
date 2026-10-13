@@ -6,7 +6,7 @@ import {
   getProductImage,
 } from '../../assets/productImages.js';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://rushline-apparel-api.onrender.com/api';
 
 const getArrayData = (data) => {
   if (Array.isArray(data)) return data;

@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import Button from '../../components/Button.jsx';
 import ProductList from '../../components/ProductList.jsx';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://rushline-apparel-api.onrender.com/api';
 const getArrayData = (data, key) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
